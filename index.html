@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MW 美仓海外仓系统 - 预报单(客户)</title>
+  <style>
+    :root{--navy:#02233a;--navy2:#032c47;--blue:#1c9bf0;--line:#e6e9ed;--muted:#85909b;--bg:#f2f4f6;--text:#3d454d}
+    *{box-sizing:border-box} html,body{height:100%;margin:0;font-family:"Microsoft YaHei","PingFang SC",Arial,sans-serif;color:var(--text);font-size:12px;overflow:hidden}
+    body{background:var(--bg)} button,input{font:inherit}
+    .app{height:100vh;display:flex;flex-direction:column}
+    .topbar{height:42px;background:#fff;border-bottom:1px solid #e7e9ec;display:flex;align-items:center;white-space:nowrap}
+    .brand{height:42px;width:158px;background:var(--navy);color:#fff;display:flex;align-items:center;padding-left:10px;font-weight:700;font-size:15px;letter-spacing:.2px}
+    .brand .mw{font-size:21px;margin-right:5px;letter-spacing:-2px}.brand .cn{font-size:13px;letter-spacing:0}
+    .collapse{width:42px;text-align:center;font-size:18px;color:#5d6770;border-right:1px solid #edf0f2;cursor:pointer}
+    .back{color:#7b848c;font-size:18px;padding:0 11px}
+    .tabs{display:flex;align-items:stretch;height:100%;gap:3px}.tab{display:flex;align-items:center;padding:0 13px;border-left:1px solid #edf0f2;color:#68727c;background:#fff;position:relative;cursor:pointer}.tab .x{font-size:13px;margin-left:8px;color:#a5adb5}.tab.active{background:#022d4a;color:#fff;border-radius:3px 3px 0 0;font-weight:600}.tab.active .x{color:#c9d9e7}
+    .top-actions{margin-left:auto;display:flex;align-items:center;gap:15px;color:#48535c;padding-right:13px}.top-actions .outline{border:1px solid #dde2e6;background:#fff;border-radius:2px;height:25px;padding:0 9px;color:#4f5860}.notify{font-size:16px;position:relative}.notify:after{content:"0";position:absolute;right:-7px;top:-8px;background:#ff314b;color:#fff;border-radius:9px;font-size:9px;padding:1px 4px}.avatar{width:27px;height:27px;border-radius:50%;background:#7bc564;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px}.user{display:flex;align-items:center;gap:5px}
+    .body{display:flex;min-height:0;flex:1}.sidebar{width:158px;background:var(--navy);color:#d7e4eb;display:flex;flex-direction:column;transition:width .2s}.sidebar.collapsed{width:48px}.sidebar.collapsed .nav-label,.sidebar.collapsed .brand-text{display:none}.nav{padding-top:4px;overflow:hidden}.nav-group{border-bottom:1px solid rgba(255,255,255,.03)}.nav-title{height:38px;display:flex;align-items:center;padding:0 15px;font-weight:700;font-size:13px;color:#e0ebf0;cursor:pointer}.nav-title .ico{width:18px;margin-right:7px;color:#cedee8;text-align:center}.nav-title .chev{margin-left:auto;font-size:14px}.nav-item{height:38px;display:flex;align-items:center;padding-left:35px;color:#afc1cb;cursor:pointer}.nav-item .ico{width:17px;margin-right:6px;font-size:12px}.nav-item.active{background:#168fe4;color:#fff;font-weight:700}.nav-item:hover,.nav-title:hover{background:rgba(29,142,218,.2)}.sidebar-foot{margin-top:auto;height:42px;border-top:1px solid rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;font-size:22px;color:#dce8ef;cursor:pointer}
+    .main{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}.workspace{padding:8px 12px 0;min-height:0;flex:1;display:flex;flex-direction:column;gap:10px}.filter{background:#fff;border:1px solid #e1e5e8;border-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.03);padding:9px 9px 10px}.fields{display:grid;grid-template-columns:1.05fr 1.12fr 1fr 1.12fr;gap:12px}.field{display:flex;align-items:center;min-width:0}.field label{width:58px;color:#2e3439;font-weight:500}.field input{height:27px;border:1px solid #d9dde1;border-radius:3px;flex:1;padding:0 10px;color:#5e6870;outline:none}.field input::placeholder{color:#adb5bc}.field input:focus{border-color:#55ace8;box-shadow:0 0 0 2px rgba(40,150,220,.12)}.filter-actions{display:flex;gap:8px;margin-top:11px}.btn{height:28px;min-width:52px;border:1px solid #d9dde2;background:#fff;border-radius:2px;color:#4f5962;cursor:pointer}.btn.primary{background:#188fdf;border-color:#188fdf;color:#fff}.btn.expand{display:flex;align-items:center;gap:5px;padding:0 12px}.btn:hover{filter:brightness(.97)}
+    .content{background:#fff;border:1px solid #e1e5e8;border-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.03);display:flex;flex-direction:column;min-height:0;flex:1}.content-head{height:52px;border-bottom:1px solid #eceff1;display:flex;align-items:center;padding:0 10px;gap:2px}.status-tabs{display:flex;align-items:stretch;height:100%;gap:3px}.status{padding:0 10px;display:flex;align-items:center;position:relative;color:#444e56;cursor:pointer}.status span{color:#9299a0;margin-left:2px}.status.active{color:#168fe4;font-weight:600}.status.active:after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;background:#1d9bf0}.head-actions{margin-left:auto;display:flex;gap:8px}.small-btn{height:28px;padding:0 11px;background:#fff;border:1px solid #d9dde2;border-radius:2px;color:#4e5860;cursor:pointer}.small-btn:hover{border-color:#58aee6;color:#148ad5}.table-wrap{overflow:auto;flex:1}.data-table{border-collapse:collapse;width:100%;min-width:1760px;table-layout:fixed;font-size:11px}.data-table th,.data-table td{border-right:1px solid #eceff1;border-bottom:1px solid #eceff1;height:36px;padding:0 8px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.data-table th{height:31px;background:#f7f8f9;color:#4f5962;font-weight:600}.data-table th:first-child,.data-table td:first-child{width:38px}.data-table th:nth-child(2){width:125px}.data-table th:nth-child(3){width:76px}.data-table th:nth-child(4){width:72px}.data-table th:nth-child(5){width:98px}.data-table th:nth-child(6){width:90px}.data-table th:nth-child(7){width:104px}.data-table th:nth-child(8){width:118px}.data-table th:nth-child(9){width:74px}.data-table th:nth-child(10){width:74px}.data-table th:nth-child(11){width:100px}.data-table th:nth-child(12){width:112px}.data-table th:nth-child(13){width:112px}.data-table th:nth-child(14){width:86px}.data-table th:nth-child(15){width:88px}.data-table th:nth-child(16){width:115px}.data-table th:nth-child(17){width:115px}.data-table th:nth-child(18){width:110px}.data-table th:nth-child(19){width:110px}.data-table th:nth-child(20){width:95px}.data-table th:nth-child(21){width:130px}.data-table tbody tr:hover{background:#f8fbfd}.link{color:#168fe4;cursor:pointer}.tag{display:inline-block;background:#1598e9;color:#fff;border-radius:2px;padding:3px 8px;font-size:11px}.ops{color:#178fdc}.footer{height:39px;display:flex;align-items:center;justify-content:flex-end;gap:12px;padding:0 10px;color:#4b555d;border-top:1px solid #eceff1}.pager{display:flex;align-items:center;gap:8px}.page-num{width:21px;height:22px;border:1px solid #1d9bf0;color:#168fe4;border-radius:2px;text-align:center;line-height:20px}.size{height:24px;border:1px solid #d9dde2;background:#fff;border-radius:2px;padding:0 7px;color:#4d565f}.float-tools{position:fixed;right:9px;bottom:285px;display:flex;flex-direction:column;gap:12px}.float-tools div{width:25px;height:25px;border-radius:50%;background:#f58ea9;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+    @media (max-width:1100px){.fields{grid-template-columns:1fr 1fr}.top-actions{gap:7px}.data-table{min-width:1600px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="mw">MW</span><span class="cn brand-text">美仓海外仓系统</span></div>
+      <div class="collapse" id="collapseBtn">☰</div><div class="back">‹</div>
+      <div class="tabs">
+        <div class="tab">客户DW通知... <span class="x">×</span></div>
+        <div class="tab">循环柜预警 <span class="x">×</span></div>
+        <div class="tab active">预报单(客户) <span class="x">×</span></div>
+        <div class="tab">暂存(客户) <span class="x">×</span></div>
+      </div>
+      <div class="top-actions"><button class="outline">导出任务中心</button><button class="outline">仓库信息</button><button class="outline">英文</button><span class="notify">♧</span><span class="user"><span class="avatar">♙</span><span>x01</span></span></div>
+    </header>
+    <div class="body">
+      <aside class="sidebar" id="sidebar">
+        <nav class="nav">
+          <div class="nav-group"><div class="nav-title"><span class="ico">▣</span><span class="nav-label">货件管理</span><span class="chev">⌃</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">客户DW通知...</span></div></div>
+          <div class="nav-group"><div class="nav-title"><span class="ico">⌂</span><span class="nav-label">客户管理</span><span class="chev">⌃</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">循环柜预警</span></div></div>
+          <div class="nav-group"><div class="nav-title"><span class="ico">▤</span><span class="nav-label">单据管理</span><span class="chev">⌃</span></div><div class="nav-item active"><span class="ico">▣</span><span class="nav-label">预报单(客户)</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">暂存(客户)</span></div><div class="nav-item" id="interceptCustomerNav"><span class="ico">♧</span><span class="nav-label">拦截(客户)</span></div></div>
+          <div class="nav-group"><div class="nav-title"><span class="ico">♙</span><span class="nav-label">报价询价</span><span class="chev">⌃</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">报价方案</span></div></div>
+          <div class="nav-group"><div class="nav-title"><span class="ico">♙</span><span class="nav-label">询价管理</span><span class="chev">⌃</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">询价</span></div><div class="nav-item"><span class="ico">♧</span><span class="nav-label">报价管理</span></div></div>
+        </nav>
+        <div class="sidebar-foot" id="footCollapse">‹</div>
+      </aside>
+      <main class="main">
+        <div class="workspace">
+          <section class="filter">
+            <div class="fields">
+              <div class="field"><label>预报单号</label><input id="fNo" placeholder="预报单号" /></div>
+              <div class="field"><label>入仓号</label><input placeholder="批量查询多个用','号隔开" /></div>
+              <div class="field"><label>柜号</label><input placeholder="柜号" /></div>
+              <div class="field"><label>ReferenceID</label><input placeholder="批量查询多个用','号隔开" /></div>
+            </div>
+            <div class="filter-actions"><button class="btn primary" id="searchBtn">搜索</button><button class="btn" id="resetBtn">重置</button><button class="btn expand" id="expandBtn"><span>⌄</span>展开</button></div>
+          </section>
+          <section class="content">
+            <div class="content-head"><div class="status-tabs" id="statusTabs"><div class="status active" data-status="全部">全部(<span>1</span>)</div><div class="status" data-status="草稿">草稿(<span>0</span>)</div><div class="status" data-status="预报">预报(<span>0</span>)</div><div class="status" data-status="接受">接受(<span>0</span>)</div><div class="status" data-status="运输中">运输中(<span>0</span>)</div><div class="status" data-status="预约池">预约池(<span>0</span>)</div><div class="status" data-status="提柜">提柜(<span>0</span>)</div><div class="status" data-status="入库处理中">入库处理中(<span>1</span>)</div><div class="status" data-status="已完成">已完成(<span>0</span>)</div><div class="status" data-status="拒绝/取消">拒绝/取消(<span>0</span>)</div></div><div class="head-actions"><button class="small-btn" id="newBtn">新增预报单</button><button class="small-btn">附件</button></div></div>
+            <div class="table-wrap"><table class="data-table"><thead><tr><th>#</th><th>预报单号 ↕</th><th>仓库</th><th>集装箱类型</th><th>柜号</th><th>转运方式</th><th>FBA仓库</th><th>船司代码</th><th>预报总箱数</th><th>总体积</th><th>预计开始时间</th><th>预计到港时间</th><th>是否带托架</th><th>结算类型</th><th>创建时间</th><th>实际提柜时间</th><th>拆柜时间</th><th>还空时间</th><th>状态</th><th>操作</th></tr></thead><tbody id="rows"><tr><td><input type="checkbox" /></td><td class="link">REQ260804-0001-M05-7845</td><td>休斯顿仓</td><td>40GP</td><td class="link">TTX2608041</td><td>整柜直送</td><td></td><td>BBBB</td><td>10</td><td>10</td><td>2026-08-04</td><td>2026-08-04</td><td>是</td><td>整柜直送</td><td>2026-08-04 15:59:03</td><td></td><td></td><td></td><td><span class="tag">入库处理中</span></td><td><span class="ops">上传附件&nbsp; 更多⌄</span></td></tr></tbody></table></div>
+            <div class="footer"><span>共 1 条</span><div class="pager"><span class="page-num">1</span><select class="size"><option>20 条/页</option></select></div></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div class="float-tools"><div>◈</div><div>文</div></div>
+  </div>
+  <script>
+    const sidebar=document.getElementById('sidebar'); const collapseBtn=document.getElementById('collapseBtn'); const footCollapse=document.getElementById('footCollapse');
+    function toggleSide(){sidebar.classList.toggle('collapsed');footCollapse.textContent=sidebar.classList.contains('collapsed')?'›':'‹'} collapseBtn.onclick=toggleSide; footCollapse.onclick=toggleSide;
+    document.querySelectorAll('.status').forEach(el=>el.onclick=()=>{document.querySelectorAll('.status').forEach(x=>x.classList.remove('active'));el.classList.add('active')});
+    document.getElementById('searchBtn').onclick=()=>{const q=document.getElementById('fNo').value.trim(); const row=document.querySelector('#rows tr'); row.style.display=(!q||row.innerText.includes(q))?'':'none'};
+    document.getElementById('resetBtn').onclick=()=>{document.getElementById('fNo').value='';document.querySelector('#rows tr').style.display=''};
+    document.getElementById('expandBtn').onclick=e=>{e.currentTarget.classList.toggle('on');e.currentTarget.querySelector('span').textContent=e.currentTarget.classList.contains('on')?'⌃':'⌄'};
+    document.getElementById('newBtn').onclick=()=>alert('新增预报单功能');
+    document.getElementById('interceptCustomerNav').onclick=()=>{window.location.href='intercept-client/index.html'};
+  </script>
+</body>
+</html>
