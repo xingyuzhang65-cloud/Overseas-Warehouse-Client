@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>暂存库存 - 美仓海外仓系统</title>
-  <link rel="stylesheet" href="styles.css?v=20260901-client-readonly" />
+  <link rel="stylesheet" href="styles.css?v=20260903-client-fields" />
 </head>
 <body class="client-readonly">
 
@@ -519,6 +519,12 @@
 <div class="intercept-toast" id="interceptToast" role="status" aria-live="polite" hidden></div>
 <div class="floating-tools" aria-hidden="true"><span>⌘</span><span>☆</span></div>
 <div class="watermarks" id="watermarks"></div>
-<script src="script.js?v=20260901-client-readonly"></script>
+<script src="script.js?v=20260903-client-fields"></script>
+<div class="intercept-overlay" id="interceptFieldOverlay" hidden>
+  <section class="intercept-feedback-modal intercept-compact-modal" role="dialog" aria-modal="true" aria-labelledby="interceptFieldTitle">
+    <header><h2 id="interceptFieldTitle">编辑字段</h2><button class="intercept-close" id="interceptFieldClose" type="button" aria-label="关闭字段编辑">×</button></header>
+    <form id="interceptFieldForm"><div class="intercept-feedback-content"><p id="interceptFieldContext"></p><label><span id="interceptFieldLabel">字段</span><input id="interceptFieldText" type="text" maxlength="120" autocomplete="off" /></label><small class="intercept-field-hint">清空内容后保存即可删除该字段值。</small></div><footer><button class="btn" id="interceptFieldCancel" type="button">取消</button><button class="btn primary" type="submit">保存</button></footer></form>
+  </section>
+</div>
 </body>
 </html>

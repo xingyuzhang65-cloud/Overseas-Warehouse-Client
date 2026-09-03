@@ -141,5 +141,130 @@
     function closeDetail(){document.getElementById('detailOverlay').hidden=true;interceptDetailIndex=-1} document.getElementById('detailClose').onclick=closeDetail;document.getElementById('detailCancel').onclick=closeDetail;document.getElementById('detailOverlay').onclick=e=>{if(e.target===e.currentTarget)closeDetail()};
     document.getElementById('interceptExportButton').onclick=()=>{const rows=interceptTasks.filter((_,i)=>interceptSelected.has(i));if(!rows.length){alert('请先勾选需要导出的记录');return}const head=['客户名称','拦截类型','拦截单号','入仓号','柜号','预报单状态','拦截原因','拦截结果','拦截箱数','客户备注','拦截来源','申请人','申请时间'];const csv=[head,...rows.map(t=>[t.customer,t.type,t.no,t.waybill,t.container,t.forecast,t.reason,t.result,t.boxes,t.remark,t.source,t.applicant,t.time])].map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));a.download='拦截客户记录.csv';a.click()};
   </script>
+  <style>
+    .root-filter-clear,.root-detail-action{height:25px;margin-left:6px;padding:0 7px;border:1px solid #d9dde2;border-radius:2px;background:#fff;color:#4f5962;cursor:pointer;white-space:nowrap}
+    .root-filter-clear:hover,.root-detail-action:hover{border-color:#168fe4;color:#168fe4}
+    .root-detail-action.danger{color:#d64b4b}
+  </style>
+  <script>
+    (() => {
+      const customerLabel = "客户名称";
+      const sourceLabel = "拦截来源";
+      const ensureRootInterceptFilters = () => {
+        return;
+        const fields = document.querySelector("#interceptWorkspace .fields");
+        if (!fields || document.getElementById("interceptCustomerFilter")) return;
+        [["interceptCustomerFilter", customerLabel, "全部客户"], ["interceptSourceFilter", sourceLabel, "全部拦截来源"]].forEach(([id, label, placeholder]) => {
+          const field = document.createElement("div");
+          field.className = "field";
+          field.innerHTML = `<label>${label}</label><input id="${id}" placeholder="${placeholder}" /><button type="button" class="root-filter-clear" data-root-clear="${id}">清空</button>`;
+          fields.appendChild(field);
+          field.querySelector("input").addEventListener("keydown", (event) => { if (event.key === "Enter") renderIntercept(); });
+          field.querySelector("button").addEventListener("click", () => { field.querySelector("input").value = ""; renderIntercept(); });
+        });
+      };
+      const enhanceRootDetail = () => {
+        const detail = document.getElementById("detailText");
+        const index = interceptDetailIndex;
+        const task = Array.isArray(interceptTasks) && interceptTasks[index];
+        if (!detail || !task) return;
+        const fields = [...detail.children];
+        const addButton = (node, field, label) => {
+          if (!node || node.querySelector(`[data-root-detail-field="${field}"]`)) return;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "root-detail-action";
+          button.dataset.rootDetailField = field;
+          button.textContent = "编辑";
+          button.title = `编辑${label}`;
+          node.appendChild(button);
+          const remove = document.createElement("button");
+          remove.type = "button";
+          remove.className = "root-detail-action danger";
+          remove.dataset.rootDetailDelete = field;
+          remove.textContent = "删除";
+          remove.title = `删除${label}`;
+          node.appendChild(remove);
+        };
+        addButton(fields[0], "customer", customerLabel);
+        addButton(fields[8], "source", sourceLabel);
+        [fields[0], fields[4], fields[8]].forEach((node) => node?.remove());
+        if (!detail.querySelector("[data-root-remark-field]")) {
+          const remark = document.createElement("div");
+          remark.dataset.rootRemarkField = "remark";
+          remark.innerHTML = `<strong>备注：</strong>${esc(task.remark || "-")}`;
+          addButton(remark, "remark", "备注");
+          detail.appendChild(remark);
+        }
+      };
+      const reopenRootDetail = () => {
+        const button = [...document.querySelectorAll("#interceptRows [data-intercept-detail]")].find((item) => Number(item.dataset.interceptDetail) === interceptDetailIndex);
+        button?.click();
+      };
+      const originalRenderIntercept = renderIntercept;
+      renderIntercept = function () {
+        ensureRootInterceptFilters();
+        originalRenderIntercept();
+        const header = document.querySelector("#interceptWorkspace .intercept-table th:nth-child(11)");
+        if (header) header.textContent = "备注";
+        const hint = document.querySelector("#interceptWorkspace .intercept-summary span:nth-child(2)");
+        if (hint) hint.textContent = "支持导出与编辑备注";
+        const headers = [...document.querySelectorAll("#interceptWorkspace .intercept-table thead th")];
+        ["客户名称", "预报单状态", "拦截来源"].forEach((label) => {
+          const column = headers.findIndex((cell) => cell.textContent.includes(label));
+          if (column < 0) return;
+          headers[column].hidden = true;
+          document.querySelectorAll("#interceptRows tr").forEach((row) => { if (row.children[column]) row.children[column].hidden = true; });
+        });
+        const customer = (document.getElementById("interceptCustomerFilter")?.value || "").trim().toLowerCase();
+        const source = (document.getElementById("interceptSourceFilter")?.value || "").trim().toLowerCase();
+        document.querySelectorAll("#interceptRows tr").forEach((row) => {
+          const cells = row.children;
+          const matchCustomer = !customer || (cells[1]?.textContent || "").toLowerCase().includes(customer);
+          const matchSource = !source || (cells[11]?.textContent || "").toLowerCase().includes(source);
+          row.style.display = matchCustomer && matchSource ? "" : "none";
+        });
+      };
+      ensureRootInterceptFilters();
+      document.getElementById("interceptSearchButton")?.addEventListener("click", renderIntercept);
+      document.getElementById("interceptResetButton")?.addEventListener("click", () => {
+        ["interceptCustomerFilter", "interceptSourceFilter"].forEach((id) => { const input = document.getElementById(id); if (input) input.value = ""; });
+        renderIntercept();
+      });
+      document.getElementById("interceptRows")?.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-intercept-detail]");
+        if (button) setTimeout(enhanceRootDetail, 0);
+        const edit = event.target.closest("[data-root-detail-field], [data-root-detail-delete]");
+        if (!edit) return;
+        const task = interceptTasks[interceptDetailIndex];
+        const field = edit.dataset.rootDetailField || edit.dataset.rootDetailDelete;
+        if (!task || !["customer", "source", "remark"].includes(field)) return;
+        if (edit.dataset.rootDetailDelete && !window.confirm(`确认删除${field === "remark" ? "备注" : field === "customer" ? customerLabel : sourceLabel}吗？`)) return;
+        const current = task[field] || "";
+        const next = edit.dataset.rootDetailDelete ? "" : window.prompt(`请输入${field === "remark" ? "备注" : field === "customer" ? customerLabel : sourceLabel}`, current);
+        if (next === null) return;
+        task[field] = String(next).trim();
+        if (field === "remark") task.customerRemark = task.remark;
+        renderIntercept();
+        reopenRootDetail();
+      });
+      document.getElementById("detailOverlay")?.addEventListener("click", (event) => {
+        const edit = event.target.closest("[data-root-detail-field], [data-root-detail-delete]");
+        if (!edit) return;
+        const task = interceptTasks[interceptDetailIndex];
+        const field = edit.dataset.rootDetailField || edit.dataset.rootDetailDelete;
+        if (!task) return;
+        if (edit.dataset.rootDetailDelete && !window.confirm(`确认删除${field === "remark" ? "备注" : field === "customer" ? customerLabel : sourceLabel}吗？`)) return;
+        const next = edit.dataset.rootDetailDelete ? "" : window.prompt(`请输入${field === "remark" ? "备注" : field === "customer" ? customerLabel : sourceLabel}`, task[field] || "");
+        if (next === null) return;
+        task[field] = String(next).trim();
+        if (field === "remark") task.customerRemark = task.remark;
+        renderIntercept();
+        reopenRootDetail();
+      });
+      const detailObserver = new MutationObserver(() => { if (!document.getElementById("detailOverlay")?.hidden) enhanceRootDetail(); });
+      detailObserver.observe(document.getElementById("detailText") || document.body, { childList: true, subtree: true });
+    })();
+  </script>
 </body>
 </html>

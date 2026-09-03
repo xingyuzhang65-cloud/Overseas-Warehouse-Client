@@ -2459,6 +2459,88 @@ let interceptFeedbackMode = "";
 let interceptCancelContext = { mode: "single", taskId: null };
 let interceptRemarkContext = null;
 let interceptRemarkField = "remark";
+let interceptFieldContext = null;
+let interceptFieldName = "";
+
+const INTERCEPT_EDITABLE_FIELDS = {
+  customer: { label: "\u5ba2\u6237\u540d\u79f0", property: "customer" },
+  source: { label: "\u62e6\u622a\u6765\u6e90", property: "source" }
+};
+
+function closeInterceptFieldEditor() {
+  $("#interceptFieldOverlay").hidden = true;
+  interceptFieldContext = null;
+  interceptFieldName = "";
+}
+
+function openInterceptFieldEditor(taskId, fieldName) {
+  if (!CLIENT_READONLY || !INTERCEPT_EDITABLE_FIELDS[fieldName]) return;
+  const task = getInterceptTask(taskId);
+  if (!task) return;
+  interceptFieldContext = task.id;
+  interceptFieldName = fieldName;
+  const meta = INTERCEPT_EDITABLE_FIELDS[fieldName];
+  $("#interceptFieldTitle").textContent = `\u7f16\u8f91${meta.label}`;
+  $("#interceptFieldLabel").textContent = meta.label;
+  $("#interceptFieldContext").textContent = `\u62e6\u622a\u5355\u53f7\uff1a${task.no}`;
+  $("#interceptFieldText").value = task[meta.property] || "";
+  $("#interceptFieldOverlay").hidden = false;
+  $("#interceptFieldText").focus();
+}
+
+function submitInterceptField(event) {
+  event.preventDefault();
+  if (!CLIENT_READONLY || !interceptFieldContext || !INTERCEPT_EDITABLE_FIELDS[interceptFieldName]) return;
+  const task = getInterceptTask(interceptFieldContext);
+  if (!task) return;
+  const meta = INTERCEPT_EDITABLE_FIELDS[interceptFieldName];
+  const previousValue = task[meta.property] || "";
+  const nextValue = $("#interceptFieldText").value.trim();
+  task[meta.property] = nextValue;
+  (task.logs ||= []).push({
+    time: formatLocalDateTime(),
+    user: "x01",
+    action: `\u4fee\u6539${meta.label}`,
+    change: `\"${previousValue || "-"}\" \u2192 \"${nextValue || "-"}\"`,
+    note: nextValue ? `\u5df2\u66f4\u65b0${meta.label}` : `\u5df2\u5220\u9664${meta.label}`
+  });
+  closeInterceptFieldEditor();
+  refreshInterceptFilterOptions();
+  refreshInterceptSourceFilterOptions();
+  refreshInterceptUI();
+}
+
+function enhanceInterceptFilterControls() {
+  ["customer", "source"].forEach((fieldName) => {
+    const control = interceptFilters[fieldName];
+    if (!control || control.parentElement.querySelector(`[data-clear-intercept-filter="${fieldName}"]`)) return;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "intercept-filter-clear";
+    button.dataset.clearInterceptFilter = fieldName;
+    button.textContent = "\u6e05\u7a7a";
+    button.title = `\u6e05\u7a7a${INTERCEPT_EDITABLE_FIELDS[fieldName]?.label || fieldName}\u641c\u7d22`;
+    button.addEventListener("click", () => { control.value = ""; renderInterceptRows(); });
+    control.insertAdjacentElement("afterend", button);
+  });
+}
+
+function hideClientRemovedInterceptFields() {
+  if (!CLIENT_READONLY) return;
+  ["interceptCustomerFilter", "interceptForecastStatusFilter", "interceptSourceFilter"].forEach((id) => {
+    const control = document.getElementById(id);
+    control?.closest(".filter-field")?.remove();
+  });
+}
+
+function refreshInterceptSourceFilterOptions() {
+  const control = interceptFilters.source;
+  if (!control) return;
+  const selected = control.value;
+  control.innerHTML = '<option value="">全部拦截来源</option>';
+  addOptions(control, interceptTasks.map((task) => task.source));
+  control.value = selected;
+}
 
 const interceptPage = $("#interceptPage");
 const inventoryPage = $("#inventoryPage");
@@ -3273,6 +3355,29 @@ function renderInterceptRows() {
       </tr>`;
     }).join("");
   }
+  if (CLIENT_READONLY) {
+    const listHint = $("#interceptListHint");
+    if (listHint) listHint.textContent = "支持导出与编辑备注";
+    const headerCells = [...document.querySelectorAll(".intercept-table thead th")];
+    const customerRemarkColumn = headerCells.findIndex((cell) => cell.textContent.includes("客户备注"));
+    if (customerRemarkColumn >= 0) {
+      headerCells[customerRemarkColumn].textContent = "备注";
+      interceptTableBody.querySelectorAll("tr[data-intercept-id]").forEach((row) => {
+        const task = getInterceptTask(row.dataset.interceptId);
+        const cell = row.children[customerRemarkColumn];
+        if (task && cell) { cell.textContent = task.remark || task.customerRemark || "-"; cell.title = cell.textContent; }
+      });
+    }
+    ["客户名称", "预报单状态", "拦截来源"].forEach((label) => {
+      const column = headerCells.findIndex((cell) => cell.textContent.includes(label));
+      if (column < 0) return;
+      headerCells[column].hidden = true;
+      interceptTableBody.querySelectorAll("tr").forEach((row) => { if (row.children[column]) row.children[column].hidden = true; });
+    });
+    interceptTableBody.querySelectorAll(".intercept-operation-col").forEach((cell) => {
+      cell.innerHTML = '<button class="intercept-action" data-intercept-action="detail" type="button">详情</button>';
+    });
+  }
   updateInterceptBatchControls();
   $("#interceptTableFooter").innerHTML = `<span>共 ${interceptVisibleRows.length} 条</span><button type="button">‹</button><button class="active" type="button">1</button><button type="button">›</button><select><option>50 条/页</option></select>`;
 }
@@ -3324,6 +3429,51 @@ function renderInterceptDetail(task, mode = "view") {
     field("客户备注", `${escapeHtml(task.customerRemark || "-")}<button class="intercept-action" data-detail-action="editCustomerRemark" type="button" title="编辑客户备注" style="margin-left:6px">✎</button>`),
     field("备注", CLIENT_READONLY ? escapeHtml(task.remark || "-") : `${escapeHtml(task.remark || "-")}<button class="intercept-action" data-detail-action="editRemark" type="button" title="编辑备注" style="margin-left:6px">✎</button>`)
   ].join("");
+  if (CLIENT_READONLY) {
+    const detailFields = [...$("#interceptBasicInfo").querySelectorAll(":scope > div")];
+    const addFieldButton = (fieldNode, fieldName, label) => {
+      if (!fieldNode) return;
+      const valueNode = fieldNode.querySelector("dd");
+      if (!valueNode || valueNode.querySelector(`[data-detail-field="${fieldName}"]`)) return;
+      const currentValue = valueNode.textContent.trim();
+      valueNode.textContent = "";
+      const value = document.createElement("span");
+      value.textContent = currentValue || "-";
+      valueNode.appendChild(value);
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "intercept-action";
+      edit.dataset.detailField = fieldName;
+      edit.textContent = "编辑";
+      edit.title = `编辑${label}`;
+      valueNode.appendChild(edit);
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "intercept-action danger";
+      remove.dataset.detailFieldDelete = fieldName;
+      remove.textContent = "删除";
+      remove.title = `删除${label}`;
+      valueNode.appendChild(remove);
+    };
+    addFieldButton(detailFields[0], "customer", INTERCEPT_EDITABLE_FIELDS.customer.label);
+    addFieldButton(detailFields[1], "source", INTERCEPT_EDITABLE_FIELDS.source.label);
+    ["客户名称", "预报单状态", "拦截来源"].forEach((label) => {
+      [...$("#interceptBasicInfo").querySelectorAll(":scope > div")]
+        .find((node) => node.querySelector("dt")?.textContent.includes(label))?.remove();
+    });
+    const customerRemarkField = detailFields.find((node) => node.querySelector("dt")?.textContent.includes("客户备注"));
+    if (customerRemarkField) customerRemarkField.remove();
+    const remarkField = [...$("#interceptBasicInfo").querySelectorAll(":scope > div")].find((node) => node.querySelector("dt")?.textContent.includes("备注"));
+    if (remarkField) {
+      const labelNode = remarkField.querySelector("dt");
+      const valueNode = remarkField.querySelector("dd");
+      if (labelNode) labelNode.textContent = "备注";
+      if (valueNode) {
+        const remarkValue = task.remark || task.customerRemark || "-";
+        valueNode.innerHTML = `${escapeHtml(remarkValue)}<button class="intercept-action" data-detail-action="editRemark" type="button" title="编辑备注" style="margin-left:6px">编辑</button>`;
+      }
+    }
+  }
   renderInterceptCargoBoxes(task);
   renderInterceptFee(task);
   renderInterceptOtherInfo(task);
@@ -3539,6 +3689,10 @@ function exportInterceptTasks() {
     ? ["客户名称", "拦截类型", "拦截单号", "入仓号", "柜号", "预报单状态", "拦截原因", "拦截结果", "拦截箱数", "客户备注", "备注", "拦截来源", "申请人", "申请时间", "处理人", "处理时间"]
     : ["客户名称", "拦截类型", "拦截单号", "入仓号", "柜号", "预报单状态", "拦截原因", "拦截结果", "拦截箱数", "指令费用", "核销状态", "客户备注", "备注", "拦截来源", "申请人", "申请时间", "处理人", "处理时间"];
   if (statusColumns.length) headers.splice(8, 0, ...statusColumns.map((column) => column.label));
+  if (CLIENT_READONLY) {
+    const customerRemarkHeader = headers.findIndex((header) => header === "客户备注");
+    if (customerRemarkHeader >= 0) headers[customerRemarkHeader] = "备注";
+  }
   const rows = tasks.map((task) => {
     const result = getInterceptDisplayStatus(task);
     return [
@@ -3548,6 +3702,16 @@ function exportInterceptTasks() {
     ];
   });
   if (statusColumns.length) rows.forEach((row, index) => { const task = tasks[index]; row.splice(8, 0, ...statusColumns.map((column) => task[column.field] || "")); });
+  if (CLIENT_READONLY) {
+    const removedColumns = headers.reduce((indexes, header, index) => {
+      if (["客户名称", "预报单状态", "拦截来源"].includes(header)) indexes.push(index);
+      return indexes;
+    }, []);
+    removedColumns.reverse().forEach((index) => {
+      headers.splice(index, 1);
+      rows.forEach((row) => row.splice(index, 1));
+    });
+  }
   const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\n");
   const blob = new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -3642,17 +3806,29 @@ function closeInterceptCancelReason() {
 }
 
 function openInterceptRemark(taskId, field = "remark") {
-  if (CLIENT_READONLY && field !== "customerRemark") return;
+  if (CLIENT_READONLY && !["remark", "customerRemark"].includes(field)) return;
   const task = getInterceptTask(taskId);
   if (!task) return;
   interceptRemarkContext = task.id;
   interceptRemarkField = field;
   const isCustomerRemark = field === "customerRemark";
+  $("#interceptRemarkTitle").textContent = "编辑备注";
+  $("#interceptRemarkLabel").textContent = "备注";
+  $("#interceptRemarkText").placeholder = "请输入备注内容";
+  $("#interceptRemarkText").value = task.remark || task.customerRemark || "";
+  if (CLIENT_READONLY) interceptRemarkField = "remark";
   $("#interceptRemarkTitle").textContent = isCustomerRemark ? "编辑客户备注" : "编辑备注";
   $("#interceptRemarkContext").textContent = `拦截单号：${task.no}`;
   $("#interceptRemarkLabel").textContent = isCustomerRemark ? "客户备注" : "备注内容";
   $("#interceptRemarkText").placeholder = isCustomerRemark ? "请输入客户备注" : "请输入备注内容";
   $("#interceptRemarkText").value = task[field] || "";
+  if (CLIENT_READONLY) {
+    $("#interceptRemarkTitle").textContent = "编辑备注";
+    $("#interceptRemarkLabel").textContent = "备注";
+    $("#interceptRemarkText").placeholder = "请输入备注内容";
+    $("#interceptRemarkText").value = task.remark || task.customerRemark || "";
+    interceptRemarkField = "remark";
+  }
   $("#interceptRemarkOverlay").hidden = false;
   $("#interceptRemarkText").focus();
 }
@@ -3664,9 +3840,10 @@ function submitInterceptRemark(event) {
   if (!task) return;
   const remark = $("#interceptRemarkText").value.trim();
   const field = interceptRemarkField;
-  if (CLIENT_READONLY && field !== "customerRemark") return;
-  const previousRemark = task[field] || "";
-  task[field] = remark;
+  if (CLIENT_READONLY && !["remark", "customerRemark"].includes(field)) return;
+  const previousRemark = task.remark || task.customerRemark || "";
+  task.remark = remark;
+  if (CLIENT_READONLY) task.customerRemark = remark;
   if (CLIENT_READONLY) {
     task.logs.push({
       time: formatLocalDateTime(),
@@ -3943,6 +4120,9 @@ function refreshInterceptFilterOptions() {
 function initInterceptManagement() {
   interceptTasks.filter((task) => task.status === "已完成").forEach(createStorageFromIntercept);
   refreshInterceptFilterOptions();
+  refreshInterceptSourceFilterOptions();
+  hideClientRemovedInterceptFields();
+  enhanceInterceptFilterControls();
   renderInterceptRows();
   $("#navInterceptManagement").addEventListener("click", showInterceptManagement);
   $("#navStagingInventory").addEventListener("click", () => showStagingInventory(activeStatus));
@@ -3993,6 +4173,7 @@ function initInterceptManagement() {
     const action = button.dataset.interceptAction;
     if (CLIENT_READONLY) {
       if (action === "editCustomerRemark") openInterceptRemark(task.id, "customerRemark");
+      if (action === "detail") openInterceptDetail(task.id);
       return;
     }
     if (action === "storage") {
@@ -4268,6 +4449,26 @@ function initInterceptManagement() {
     const task = getInterceptTask();
     if (task) openInterceptRemark(task.id, button.dataset.detailAction === "editCustomerRemark" ? "customerRemark" : "remark");
   });
+  $("#interceptDetailOverlay").addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-detail-field]");
+    const deleteButton = event.target.closest("[data-detail-field-delete]");
+    const button = editButton || deleteButton;
+    if (!button) return;
+    const fieldName = button.dataset.detailField || button.dataset.detailFieldDelete;
+    const task = getInterceptTask();
+    if (!task || !INTERCEPT_EDITABLE_FIELDS[fieldName]) return;
+    if (deleteButton) {
+      if (!window.confirm(`确认删除${INTERCEPT_EDITABLE_FIELDS[fieldName].label}吗？`)) return;
+      $("#interceptFieldText").value = "";
+    }
+    if (editButton) {
+      openInterceptFieldEditor(task.id, fieldName);
+      return;
+    }
+    interceptFieldContext = task.id;
+    interceptFieldName = fieldName;
+    submitInterceptField({ preventDefault() {} });
+  });
   $("#interceptLogClose").addEventListener("click", closeInterceptLog);
   $("#interceptLogOverlay").addEventListener("click", (event) => {
     if (event.target === $("#interceptLogOverlay")) closeInterceptLog();
@@ -4296,6 +4497,12 @@ function initInterceptManagement() {
     if (event.target === $("#interceptRemarkOverlay")) closeInterceptRemark();
   });
   $("#interceptRemarkForm").addEventListener("submit", submitInterceptRemark);
+  $("#interceptFieldClose").addEventListener("click", closeInterceptFieldEditor);
+  $("#interceptFieldCancel").addEventListener("click", closeInterceptFieldEditor);
+  $("#interceptFieldOverlay").addEventListener("click", (event) => {
+    if (event.target === $("#interceptFieldOverlay")) closeInterceptFieldEditor();
+  });
+  $("#interceptFieldForm").addEventListener("submit", submitInterceptField);
   $("#interceptBatchSuccessClose").addEventListener("click", closeInterceptBatchSuccess);
   $("#interceptBatchSuccessCancel").addEventListener("click", closeInterceptBatchSuccess);
   $("#interceptBatchSuccessOverlay").addEventListener("click", (event) => {

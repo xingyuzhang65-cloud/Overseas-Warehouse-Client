@@ -674,6 +674,11 @@ input:focus, select:focus { border-color: #7dbaf0; box-shadow: 0 0 0 1px rgba(22
   display: none !important;
 }
 .client-readonly .intercept-operation-col { width: 90px; }
+.client-readonly #interceptDetailOverlay:not([hidden]) { display: flex !important; }
+.intercept-field-hint { display: block; margin-top: 8px; color: #8a949d; font-size: 11px; }
+.intercept-filter-clear { margin-left: 6px; padding: 0 7px; height: 29px; border: 1px solid #dfe4e8; border-radius: 2px; color: #6b7580; background: #fff; cursor: pointer; white-space: nowrap; }
+.intercept-filter-clear:hover { border-color: #168ff5; color: #168ff5; }
+.intercept-detail-editable { display: inline-flex; align-items: center; gap: 4px; }
 .intercept-archived-mark {
   display: inline-flex;
   margin: 0 4px;
