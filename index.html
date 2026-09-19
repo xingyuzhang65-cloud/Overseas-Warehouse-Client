@@ -79,13 +79,13 @@
               <div class="field"><label>拦截单号</label><input id="interceptNoFilter" placeholder="请输入拦截单号" /></div>
               <div class="field"><label>入仓号</label><input id="interceptWaybillFilter" placeholder="请输入入仓号" /></div>
               <div class="field"><label>柜号</label><input id="interceptContainerFilter" placeholder="请输入柜号" /></div>
-              <div class="field"><label>拦截状态</label><select id="interceptStatusFilter"><option value="">全部拦截状态</option><option>待处理</option><option>拦截中</option><option>拦截成功</option><option>拦截失败</option><option>客户取消</option><option>管理端驳回</option></select></div>
+              <div class="field"><label>拦截状态</label><select id="interceptStatusFilter"><option value="">全部拦截状态</option><option value="待处理">待审批</option><option>拦截中</option><option>拦截成功</option><option>拦截失败</option><option>客户取消</option><option>管理端驳回</option></select></div>
             </div>
             <div class="filter-actions"><button class="btn primary" id="interceptSearchButton">搜索</button><button class="btn" id="interceptResetButton">重置</button></div>
           </section>
           <section class="content intercept-content">
             <div class="content-head"><div class="status-tabs" id="interceptStatusTabs"><div class="intercept-status" data-intercept-status="待处理">待审批(2)</div><div class="intercept-status" data-intercept-status="拦截中">拦截中(2)</div><div class="intercept-status" data-intercept-status="已完成">已完成(4)</div><div class="intercept-status" data-intercept-status="审批拒绝">已取消/已驳回(2)</div><div class="intercept-status active" data-intercept-status="全部">全部(10)</div></div><div class="head-actions"><button class="small-btn" id="interceptCancelButton" type="button">取消拦截</button><button class="small-btn" id="interceptExportButton">导出</button></div></div>
-            <div class="intercept-summary"><span id="interceptSummary">共 10 条拦截任务</span><span>勾选待处理申请可批量取消拦截</span></div>
+            <div class="intercept-summary"><span id="interceptSummary">共 10 条拦截任务</span><span>仅待审批申请可勾选并取消拦截</span></div>
             <div class="intercept-table-wrap"><table class="intercept-table"><thead><tr><th><input id="interceptSelectAll" type="checkbox" aria-label="全选" /></th><th>拦截单号</th><th>入仓号</th><th>柜号</th><th>仓库</th><th>预报单状态</th><th>拦截类型</th><th>拦截原因</th><th id="interceptResultHeader" hidden>拦截结果</th><th>拦截箱数</th><th class="closure-reason" id="interceptClosureReasonHeader" hidden>取消/驳回原因</th><th class="closure-status" id="interceptProcessingStatusHeader" hidden>处理状态</th><th>备注</th><th>申请时间</th><th>操作</th></tr></thead>
     <tbody id="interceptRows"></tbody></table></div>
             <div class="footer"><span id="interceptFooter">共 10 条</span><div class="pager"><span class="page-num">1</span><select class="size"><option>50 条/页</option></select></div></div>
@@ -145,6 +145,8 @@
       {customer:'TTTX2',type:'拆柜前拦截',no:'202607270003',warehouse:'洛杉矶仓库',waybill:'US0727',container:'WEMA1131231',forecast:'预报成功',reason:'客户申请暂停发货',result:'',boxes:2,remark:'',source:'天图拦截',applicant:'客服-张敏',time:'2026-07-27 08:42:13',status:'待处理'}
     ];
     const getInterceptStatus = task => task.status === '审批拒绝' ? (['已取消', '客户取消'].includes(task.result) ? '客户取消' : '管理端驳回') : task.status;
+    const canCancelIntercept = task => getInterceptStatus(task) === '待处理';
+    const displayInterceptStatus = task => getInterceptStatus(task) === '待处理' ? '待审批' : getInterceptStatus(task);
     const isClosedIntercept = task => ['客户取消', '管理端驳回'].includes(getInterceptStatus(task));
     const showClosureReasonColumn = () => ['审批拒绝', '客户取消', '管理端驳回', '已取消', '已驳回'].includes(interceptStatus);
     const getClosureReason = task => getInterceptStatus(task) === '客户取消' ? (task.cancelReason || '—') : getInterceptStatus(task) === '管理端驳回' ? (task.rejectReason || '—') : '—';
@@ -174,7 +176,7 @@
       const rows = interceptTasks.filter(t => (interceptStatus === '全部' || (interceptStatus === '审批拒绝' ? isClosedIntercept(t) : getInterceptStatus(t) === interceptStatus)) && (!sf || getInterceptStatus(t) === sf || (['拦截成功', '拦截失败'].includes(sf) && t.result === sf)) && (!q || t.no.toLowerCase().includes(q)) && (!w || t.waybill.toLowerCase().includes(w)) && (!c || t.container.toLowerCase().includes(c)));
       const showResult = interceptStatus === '已完成';
       const visibleIndices = new Set(rows.map(t => interceptTasks.indexOf(t)));
-      interceptSelected.forEach(i => { if (!visibleIndices.has(i)) interceptSelected.delete(i); });
+      interceptSelected.forEach(i => { if (!visibleIndices.has(i) || !canCancelIntercept(interceptTasks[i])) interceptSelected.delete(i); });
       document.getElementById('interceptResultHeader').hidden = !showResult;
       const showClosureReason = showClosureReasonColumn();
       const showProcessingStatus = interceptStatus === '全部' || showClosureReason;
@@ -185,26 +187,28 @@
       document.querySelectorAll('[data-intercept-status]').forEach(el => {
         const st = el.dataset.interceptStatus;
         el.classList.toggle('active', st === interceptStatus);
-        el.textContent = (st === '审批拒绝' ? '已取消/已驳回' : st) + '(' + (st === '全部' ? interceptTasks.length : interceptTasks.filter(t => st === '审批拒绝' ? isClosedIntercept(t) : getInterceptStatus(t) === st).length) + ')';
+        el.textContent = (st === '审批拒绝' ? '已取消/已驳回' : st === '待处理' ? '待审批' : st) + '(' + (st === '全部' ? interceptTasks.length : interceptTasks.filter(t => st === '审批拒绝' ? isClosedIntercept(t) : getInterceptStatus(t) === st).length) + ')';
       });
       document.getElementById('interceptRows').innerHTML = rows.map(t => {
-        const i = interceptTasks.indexOf(t), checked = interceptSelected.has(i) ? ' checked' : '';
+        const i = interceptTasks.indexOf(t), checked = interceptSelected.has(i) ? ' checked' : '', disabled = canCancelIntercept(t) ? '' : ' disabled title="仅待审批申请可取消"';
         const tag = t.result === '拦截成功' ? 'success' : t.result === '拦截失败' ? 'failed' : '';
-        return '<tr><td><input type="checkbox" data-intercept-index="' + i + '"' + checked + '></td>' +
+        return '<tr><td><input type="checkbox" data-intercept-index="' + i + '"' + checked + disabled + '></td>' +
           '<td class="link">' + esc(t.no) + '</td><td>' + esc(t.waybill) + '</td><td>' + esc(t.container) + '</td><td>' + esc(t.warehouse || '—') + '</td><td>' + esc(t.forecast || '—') + '</td><td>' + esc(t.type) + '</td><td title="' + esc(t.reason || '—') + '">' + esc(t.reason || '—') + '</td>' +
           (showResult ? '<td><span class="intercept-tag ' + tag + '">' + esc(t.result || '—') + '</span></td>' : '') +
-          '<td>' + esc(t.boxes) + '</td>' + (showClosureReason ? '<td title="' + esc(getClosureReason(t)) + '">' + esc(getClosureReason(t)) + '</td>' : '') + (showProcessingStatus ? '<td><span class="intercept-tag ' + (getInterceptStatus(t) === '客户取消' ? 'cancelled' : getInterceptStatus(t) === '管理端驳回' ? 'failed' : '') + '">' + esc(getInterceptStatus(t)) + '</span></td>' : '') + '<td title="' + esc(t.remark || '—') + '">' + esc(t.remark || '—') + '</td><td>' + esc(t.time) + '</td><td><button class="intercept-op" data-intercept-detail="' + i + '">详情</button></td></tr>';
+          '<td>' + esc(t.boxes) + '</td>' + (showClosureReason ? '<td title="' + esc(getClosureReason(t)) + '">' + esc(getClosureReason(t)) + '</td>' : '') + (showProcessingStatus ? '<td><span class="intercept-tag ' + (getInterceptStatus(t) === '客户取消' ? 'cancelled' : getInterceptStatus(t) === '管理端驳回' ? 'failed' : '') + '">' + esc(displayInterceptStatus(t)) + '</span></td>' : '') + '<td title="' + esc(t.remark || '—') + '">' + esc(t.remark || '—') + '</td><td>' + esc(t.time) + '</td><td><button class="intercept-op" data-intercept-detail="' + i + '">详情</button></td></tr>';
       }).join('') || '<tr><td colspan="' + (12 + Number(showResult) + Number(showClosureReason) + Number(showProcessingStatus)) + '" style="height:80px;color:#9aa3aa">暂无匹配的拦截任务</td></tr>';
       const selectAll = document.getElementById('interceptSelectAll');
-      const selectedCount = rows.filter(t => interceptSelected.has(interceptTasks.indexOf(t))).length;
-      selectAll.checked = rows.length > 0 && selectedCount === rows.length;
-      selectAll.indeterminate = selectedCount > 0 && selectedCount < rows.length;
+      const cancellableRows = rows.filter(canCancelIntercept);
+      const selectedCount = cancellableRows.filter(t => interceptSelected.has(interceptTasks.indexOf(t))).length;
+      selectAll.disabled = cancellableRows.length === 0;
+      selectAll.checked = cancellableRows.length > 0 && selectedCount === cancellableRows.length;
+      selectAll.indeterminate = selectedCount > 0 && selectedCount < cancellableRows.length;
     }
 
     interceptNav.onclick=showIntercept;interceptTopTab.onclick=showIntercept;forecastNav.onclick=showForecast;forecastTopTab.onclick=showForecast;
     document.querySelectorAll('[data-intercept-status]').forEach(el=>el.onclick=()=>{interceptStatus=el.dataset.interceptStatus;interceptSelected.clear();renderIntercept()});
     document.getElementById('interceptSearchButton').onclick=renderIntercept;document.getElementById('interceptResetButton').onclick=()=>{['interceptNoFilter','interceptWaybillFilter','interceptContainerFilter'].forEach(id=>document.getElementById(id).value='');document.getElementById('interceptStatusFilter').value='';interceptStatus='全部';renderIntercept()};
-    document.getElementById('interceptSelectAll').onchange=e=>{document.querySelectorAll('#interceptRows [data-intercept-index]').forEach(cb=>{const i=Number(cb.dataset.interceptIndex);e.target.checked?interceptSelected.add(i):interceptSelected.delete(i)});renderIntercept()};
+    document.getElementById('interceptSelectAll').onchange=e=>{document.querySelectorAll('#interceptRows [data-intercept-index]:not(:disabled)').forEach(cb=>{const i=Number(cb.dataset.interceptIndex);e.target.checked?interceptSelected.add(i):interceptSelected.delete(i)});renderIntercept()};
     function selectInterceptDetailTab(tab) {
       document.querySelectorAll('[data-detail-tab]').forEach(button => {
         const active = button.dataset.detailTab === tab;
@@ -240,8 +244,8 @@
     document.getElementById('interceptCancelButton').onclick = () => {
       const tasks = interceptTasks.filter((_, i) => interceptSelected.has(i));
       if (!tasks.length) { alert('请先勾选需要取消拦截的申请'); return; }
-      if (tasks.some(task => task.status !== '待处理')) {
-        alert('仅支持取消待处理的拦截申请，请重新勾选');
+      if (tasks.some(task => !canCancelIntercept(task))) {
+        alert('仅支持取消待审批的拦截申请，请重新勾选');
         return;
       }
       pendingCancelTasks = tasks.slice();
@@ -266,7 +270,7 @@
         cancelInterceptReason.focus();
         return;
       }
-      if (!pendingCancelTasks.length || pendingCancelTasks.some(task => !interceptTasks.includes(task) || task.status !== '待处理')) {
+      if (!pendingCancelTasks.length || pendingCancelTasks.some(task => !interceptTasks.includes(task) || !canCancelIntercept(task))) {
         cancelInterceptError.textContent = '申请状态已变化，请关闭弹窗后重新选择';
         return;
       }
@@ -292,7 +296,7 @@
       document.getElementById('detailFlow').innerHTML = ['提交申请', '拦截中', finalLabel].map((label, index) => '<div class="detail-flow-step ' + (index === step ? 'active' : '') + '"><i>' + (index + 1) + '</i><span>' + esc(label) + '</span></div>').join('');
       document.getElementById('detailCargoBody').innerHTML = Array.from({length: Number(t.boxes) || 1}, (_, index) => '<tr><td>' + esc(t.container || '-') + '-' + String(index + 1).padStart(2, '0') + '</td><td>' + esc(t.waybill || '-') + '</td><td>待处理</td></tr>').join('');
       document.getElementById('detailContext').textContent = '拦截单号：' + t.no;
-      const fields = [['拦截单号', t.no], ['入仓号', t.waybill], ['柜号', t.container], ['仓库', t.warehouse || '—'], ['预报单状态', t.forecast || '—'], ['拦截类型', t.type], ['拦截原因', t.reason || '—'], ['处理状态', getInterceptStatus(t)], ...(isClosedIntercept(t) ? [[getInterceptStatus(t) === '客户取消' ? '取消原因' : '驳回原因', getClosureReason(t)], ...(t.cancelledAt ? [['取消时间', t.cancelledAt]] : [])] : []), ...(complete ? [['拦截结果', t.result || '—']] : []), ['拦截箱数', t.boxes], ['申请时间', t.time]];
+      const fields = [['拦截单号', t.no], ['入仓号', t.waybill], ['柜号', t.container], ['仓库', t.warehouse || '—'], ['预报单状态', t.forecast || '—'], ['拦截类型', t.type], ['拦截原因', t.reason || '—'], ['处理状态', displayInterceptStatus(t)], ...(isClosedIntercept(t) ? [[getInterceptStatus(t) === '客户取消' ? '取消原因' : '驳回原因', getClosureReason(t)], ...(t.cancelledAt ? [['取消时间', t.cancelledAt]] : [])] : []), ...(complete ? [['拦截结果', t.result || '—']] : []), ['拦截箱数', t.boxes], ['申请时间', t.time]];
       document.getElementById('detailText').innerHTML = fields.map(([label, value]) => '<div' + (['取消原因', '驳回原因'].includes(label) ? ' class="closure-detail"' : '') + '><strong>' + label + '：</strong>' + esc(value) + '</div>').join('');
       document.getElementById('detailOtherContent').innerHTML = '<p><strong>申请附件：</strong>' + esc(t.attachmentName || '暂无附件') + '</p>';
       selectInterceptDetailTab('cargo');
@@ -305,7 +309,7 @@
       if (!rows.length) { alert('请先勾选需要导出的记录'); return; }
       const showResult = interceptStatus === '已完成';
       const head = ['拦截单号', '入仓号', '柜号', '仓库', '预报单状态', '拦截类型', '拦截原因', ...(showResult ? ['拦截结果'] : []), '拦截箱数', ...(showClosureReasonColumn() ? ['取消原因', '驳回原因'] : []), ...(interceptStatus === '全部' || showClosureReasonColumn() ? ['处理状态'] : []), '备注', '申请时间'];
-      const csv = [head, ...rows.map(t => [t.no, t.waybill, t.container, t.warehouse || '—', t.forecast || '—', t.type, t.reason || '—', ...(showResult ? [t.status === '已完成' ? t.result : ''] : []), t.boxes, ...(showClosureReasonColumn() ? [getInterceptStatus(t) === '客户取消' ? getClosureReason(t) : '', getInterceptStatus(t) === '管理端驳回' ? getClosureReason(t) : ''] : []), ...(interceptStatus === '全部' || showClosureReasonColumn() ? [getInterceptStatus(t)] : []), t.remark, t.time])].map(row => row.map(value => '"' + String(value ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
+      const csv = [head, ...rows.map(t => [t.no, t.waybill, t.container, t.warehouse || '—', t.forecast || '—', t.type, t.reason || '—', ...(showResult ? [t.status === '已完成' ? t.result : ''] : []), t.boxes, ...(showClosureReasonColumn() ? [getInterceptStatus(t) === '客户取消' ? getClosureReason(t) : '', getInterceptStatus(t) === '管理端驳回' ? getClosureReason(t) : ''] : []), ...(interceptStatus === '全部' || showClosureReasonColumn() ? [displayInterceptStatus(t)] : []), t.remark, t.time])].map(row => row.map(value => '"' + String(value ?? '').replace(/"/g, '""') + '"').join(',')).join('\n');
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob(['\ufeff' + csv], {type: 'text/csv;charset=utf-8'}));
       a.download = '拦截客户记录.csv';
@@ -365,7 +369,7 @@
         button?.click();
       };
       const hint = document.querySelector('#interceptWorkspace .intercept-summary span:nth-child(2)');
-      if (hint) hint.textContent = '勾选待处理申请可批量取消；取消时须填写原因';
+      if (hint) hint.textContent = '仅待审批申请可勾选并取消；取消时须填写原因';
 
           ensureRootInterceptFilters();
       document.getElementById("interceptSearchButton")?.addEventListener("click", renderIntercept);
