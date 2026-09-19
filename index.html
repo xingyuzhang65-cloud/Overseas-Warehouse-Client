@@ -146,7 +146,14 @@
     ];
     const getInterceptStatus = task => task.status === '审批拒绝' ? (['已取消', '客户取消'].includes(task.result) ? '客户取消' : '管理端驳回') : task.status;
     const canCancelIntercept = task => getInterceptStatus(task) === '待处理';
-    const displayInterceptStatus = task => getInterceptStatus(task) === '待处理' ? '待审批' : getInterceptStatus(task);
+    const displayInterceptStatus = task => {
+      const status = getInterceptStatus(task);
+      if (status === '待处理') return '待审批';
+      if (status === '已完成') return task.result === '拦截失败' ? '拦截失败' : '拦截成功';
+      if (status === '客户取消') return '取消';
+      if (status === '管理端驳回') return '驳回';
+      return status;
+    };
     const isClosedIntercept = task => ['客户取消', '管理端驳回'].includes(getInterceptStatus(task));
     const showClosureReasonColumn = () => ['审批拒绝', '客户取消', '管理端驳回', '已取消', '已驳回'].includes(interceptStatus);
     const getClosureReason = task => getInterceptStatus(task) === '客户取消' ? (task.cancelReason || '—') : getInterceptStatus(task) === '管理端驳回' ? (task.rejectReason || '—') : '—';
@@ -250,7 +257,7 @@
         return;
       }
       pendingCancelTasks = tasks.slice();
-      document.getElementById('cancelInterceptSummary').textContent = '将取消选中的 ' + tasks.length + ' 条拦截申请。同一取消原因将应用到全部选中申请，提交后状态为“客户取消”。';
+      document.getElementById('cancelInterceptSummary').textContent = '将取消选中的 ' + tasks.length + ' 条拦截申请。同一取消原因将应用到全部选中申请，提交后处理状态为“取消”。';
       cancelInterceptReason.value = '';
       cancelInterceptError.textContent = '';
       cancelInterceptReason.removeAttribute('aria-invalid');
